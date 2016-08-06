@@ -1,9 +1,9 @@
 package pedalada.pedalapp;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.location.Location;
@@ -19,7 +19,6 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.esri.android.map.GraphicsLayer;
 import com.esri.android.map.LocationDisplayManager;
@@ -30,13 +29,16 @@ import com.esri.core.geometry.Point;
 import com.esri.core.geometry.SpatialReference;
 import com.esri.core.map.Graphic;
 import com.esri.core.symbol.SimpleMarkerSymbol;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 
 public class MapActivity extends AppCompatActivity {
-
-    // util
-    static boolean firstUpdate = true;
 
     // declare location objects
     private LocationManager locationManager; // accesses location services
@@ -49,7 +51,9 @@ public class MapActivity extends AppCompatActivity {
     TextView mPrecision = null;
     TextView mLatitude = null;
     TextView mLongitude = null;
+    static TextView serverTV = null;
 
+    // some cool graphics to handled later
     Drawable dStop = null;
     Drawable dBike = null;
 
@@ -65,7 +69,13 @@ public class MapActivity extends AppCompatActivity {
     // the record assets
     static public Double[] currentCoordinates = new Double[2]; // Double[0] <- Longitude
     static ArrayList<Double[]> record = new ArrayList<>();
+    static long startTime;
+    static long finishTime;
+    static boolean firstUpdate = true;
 
+    // helper for gson
+    String riderUsername = "yourMom";
+    Ride ride;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -76,7 +86,12 @@ public class MapActivity extends AppCompatActivity {
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
         configureButtons();
         configureMap();
+        ride = new Ride();
     }
+
+    // to save battery or not to save battery, that is the question.
+    @Override protected void onPause() {super.onPause(); mapView.pause();}
+    @Override protected void onResume() {super.onResume(); mapView.unpause();}
 
     public void configureMap() {
         // to add tracking points
@@ -96,84 +111,74 @@ public class MapActivity extends AppCompatActivity {
                     ldm.setLocationListener(new LocationListener() {
                         @Override
                         public void onLocationChanged(Location location) {
-                            Log.d("LocationLISTENER", "lat: " + location.getLatitude() + " long: " + location.getLongitude());
                             if(location != null) {
-                                ldm.setShowLocation(true);
-                                ldm.setAutoPanMode(LocationDisplayManager.AutoPanMode.LOCATION);
-
-                                // Log.d("LocationLISTENER", "lat: " + location.getLatitude() + " long: " + location.getLongitude());
-                                Log.d("LocationLISTENER", "Location found....");
-
-                                String longitudeStr = "Longitude: " + location.convert(location.getLongitude(), location.FORMAT_SECONDS);
-                                String latitudeStr = "Latitude: " + location.convert(location.getLatitude(), location.FORMAT_SECONDS);
-                                String precisionStr = String.format("Precisão: %.2f", location.getAccuracy());
-                                String providerStr = "Fornecedor: " + location.getProvider();
-                                String speedStr = String.format("Velocidade: %.1fmps", location.getSpeed());
-
-                                mLatitude.setText(latitudeStr);
-                                mLongitude.setText(longitudeStr);
-                                mSpeed.setText(speedStr);
-                                mProvider.setText(providerStr);
-                                mPrecision.setText(precisionStr);
-
-                                currentCoordinates[0] = location.getLongitude();
-                                currentCoordinates[1] = location.getLatitude();
-                                record.add(currentCoordinates);
-
-                                if (location.getSpeed() == 0) {
-                                    SimpleMarkerSymbol stoppedSymbol = new SimpleMarkerSymbol(Color.RED, 20, SimpleMarkerSymbol.STYLE.CIRCLE);
-                                    Point pointGeometry = (Point) GeometryEngine.project(new Point(location.getLongitude(), location.getLatitude()), SpatialReference.create(4326), mapView.getSpatialReference());
-                                    Graphic pointGraphic = new Graphic(pointGeometry, stoppedSymbol);
-                                    graphicsLayer.addGraphic(pointGraphic);
+                                if (firstUpdate) {
+                                    ldm.setShowLocation(true);
+                                    ldm.setAutoPanMode(LocationDisplayManager.AutoPanMode.LOCATION);
+                                    // Log.d("LocationLISTENER", "lat: " + location.getLatitude() + " long: " + location.getLongitude());
+                                    // Log.d("LocationLISTENER", "Location found....");
+                                    updateUI(location);
+                                    updateRecord(location);
+                                    addTrackingDot(location);
+                                    startTime = location.getTime();
+                                    firstUpdate = false;
                                 } else {
-                                    SimpleMarkerSymbol movingSymbol = new SimpleMarkerSymbol(Color.GREEN, 20, SimpleMarkerSymbol.STYLE.DIAMOND);
-                                    Point pointGeometry = (Point) GeometryEngine.project(new Point(location.getLongitude(), location.getLatitude()), SpatialReference.create(4326), mapView.getSpatialReference());
-                                    Graphic pointGraphic = new Graphic(pointGeometry, movingSymbol);
-                                    graphicsLayer.addGraphic(pointGraphic);
+                                    ldm.setShowLocation(true);
+                                    ldm.setAutoPanMode(LocationDisplayManager.AutoPanMode.LOCATION);
+                                    // Log.d("LocationLISTENER", "lat: " + location.getLatitude() + " long: " + location.getLongitude());
+                                    // Log.d("LocationLISTENER", "Location found....");
+                                    updateUI(location);
+                                    updateRecord(location);
+                                    addTrackingDot(location);
+                                    finishTime = location.getTime();
                                 }
-
+                                
                             }
-
                         }
 
                         @Override
                         public void onStatusChanged(String provider, int status, Bundle extras) {
                             Log.d("LocationLISTENER", "onStatusChanged");
-
-                            Context context = getApplicationContext();
-                            CharSequence text = "Estado de GPS alterado";
-                            int duration = Toast.LENGTH_LONG;
-                            Toast toast = Toast.makeText(context, text, duration);
-                            toast.show();
                         }
 
                         @Override
                         public void onProviderEnabled(String provider) {
                             Log.d("LocationLISTENER", "LOCATION PROVIDER ENABLED");
-
-                            Context context = getApplicationContext();
-                            CharSequence text = "GPS ligado! :)";
-                            int duration = Toast.LENGTH_LONG;
-                            Toast toast = Toast.makeText(context, text, duration);
-                            toast.show();
                         }
 
                         @Override
                         public void onProviderDisabled(String provider) {
                             Log.d("LocationLISTENER", "LOCATION PROVIDER DISABLED");
-                            ldm.setShowLocation(false);
-
-                            Context context = getApplicationContext();
-                            CharSequence text = "GPS desligado! :(";
-                            int duration = Toast.LENGTH_LONG;
-                            Toast toast = Toast.makeText(context, text, duration);
-                            toast.show();
+                            // ldm.setShowLocation(false);
                         }
                     });
                     ldm.start();
                 }
             }
         });
+    }
+
+    public void addTrackingDot(Location location) {
+
+        float speed = location.getSpeed();
+        Point geometricPoint = (Point) GeometryEngine.project(new Point(location.getLongitude(), location.getLatitude()), SpatialReference.create(4326), mapView.getSpatialReference());
+
+        if (speed == 0) {
+            SimpleMarkerSymbol stoppedSymbol = new SimpleMarkerSymbol(Color.RED, 5, SimpleMarkerSymbol.STYLE.CIRCLE);
+            Graphic pointGraphic = new Graphic(geometricPoint, stoppedSymbol);
+            graphicsLayer.addGraphic(pointGraphic);
+        } else {
+            SimpleMarkerSymbol movingSymbol = new SimpleMarkerSymbol(Color.GREEN, 5, SimpleMarkerSymbol.STYLE.DIAMOND);
+            Graphic pointGraphic = new Graphic(geometricPoint, movingSymbol);
+            graphicsLayer.addGraphic(pointGraphic);
+        }
+
+    }
+
+    public void updateRecord(Location location) {
+        currentCoordinates[0] = location.getLongitude();
+        currentCoordinates[1] = location.getLatitude();
+        record.add(currentCoordinates);
     }
 
     public void initializeViews() {
@@ -192,6 +197,23 @@ public class MapActivity extends AppCompatActivity {
 
         // initialize map
         mapView = (MapView) findViewById(R.id.map);
+
+        // server text view
+        serverTV = (TextView) findViewById(R.id.serverResponseTextView);
+    }
+
+    public void updateUI(Location location) {
+        String longitudeStr = "Longitude: " + location.convert(location.getLongitude(), location.FORMAT_SECONDS);
+        String latitudeStr = "Latitude: " + location.convert(location.getLatitude(), location.FORMAT_SECONDS);
+        String precisionStr = String.format("Precisão: %.2f", location.getAccuracy());
+        String providerStr = "Fornecedor: " + location.getProvider();
+        String speedStr = String.format("Velocidade: %.1fkm/h", location.getSpeed() * 3.6);
+
+        mLatitude.setText(latitudeStr);
+        mLongitude.setText(longitudeStr);
+        mSpeed.setText(speedStr);
+        mProvider.setText(providerStr);
+        mPrecision.setText(precisionStr);
     }
 
     public void handleLocationPermissions() {
@@ -229,19 +251,6 @@ public class MapActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        mapView.pause();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        mapView.unpause();
-    }
-
-
     public void configureButtons() {
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -259,14 +268,50 @@ public class MapActivity extends AppCompatActivity {
         bStop.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+
+                // example... but should adjust first to the itinerary performed. Eventually, fit to polygon
+                Bitmap snapshot = mapView.getDrawingMapCache((float) 1.0, (float) 1.0, 1, 1);
+                String stringedBitmap = Utils.getStringFromBitmap(snapshot);
+
+                ride.setUsername(riderUsername);
+                ride.setStartTime(startTime);
+                ride.setFinishTime(finishTime);
+                ride.setRouteRecord(record);
+                ride.setSnapshot(stringedBitmap);
+
+
+                // TODO create the JSON to send to server
+                JSONObject obj = new JSONObject();
+                String sStartTime = String.valueOf(startTime); // because longs are not supported by JSON
+                String sFinishTime = String.valueOf(finishTime);
+                String sRecord = record.toString();
+                String rider = "yourMom";
+                try {
+                    obj.put("rider", rider); // a String
+                    obj.put("startTime", sStartTime);
+                    obj.put("finishTime", sFinishTime);
+                    obj.put("coordinates", sRecord);
+                    obj.put("snapshot", stringedBitmap); // a String
+                } catch (JSONException e) {
+                    Log.d("-> JSONifization failed", e.getMessage());
+                }
+
+                // alternatively convert to gson.JsonObject instead...*
+                Gson gson = new Gson();
+                Log.d("NEW JsonObject -> ", gson.toJson(ride));
+                JsonParser jsonParser = new JsonParser();
+                JsonObject json = (JsonObject) jsonParser.parse(obj.toString()); // *...and use gson.toJson(ride)
+
                 // TODO send record to server before finishing activity
-                // Intent intent = new Intent();
-                // intent.putExtras();
-                finish();
+                Server_MyIonConnection ionConnection = new Server_MyIonConnection();
+                ionConnection.post(bStop.getContext(), json);
+
             }
         });
-
     }
 
+    // server stuff
+    public static String URL = "192.168.2.2";
+    public static String flaskIp ="127.0.0.1";
 }
 

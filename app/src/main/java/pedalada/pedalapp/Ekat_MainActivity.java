@@ -25,9 +25,9 @@ import com.esri.core.geometry.Point;
 import com.esri.core.geometry.SpatialReference;
 import com.esri.core.geometry.Unit;
 
-public class MainActivity extends AppCompatActivity {
+public class Ekat_MainActivity extends AppCompatActivity {
 
-    final static String LOG_TAG = MainActivity.class.getName();
+    final static String LOG_TAG = Ekat_MainActivity.class.getName();
 
     LocationDisplayManager lDisplayManager = null;
     MapView mapView = null;
