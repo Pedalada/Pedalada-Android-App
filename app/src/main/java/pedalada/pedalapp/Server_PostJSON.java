@@ -20,7 +20,7 @@ public class Server_PostJSON extends AsyncTask<String, Void, String> {
     // browserflask <- "http://127.0.0.1/"
     // pyflask <- "http://10.0.2.2/"
     // IPv4 <- "http://192.168.123.0/"
-    private static String IPv4 = "http://192.168.123.0/";
+    private static String IPv4 = "http://requestb.in/rgygpbrg";
     private static URL url;
     private static HttpURLConnection connection;
 
@@ -51,6 +51,7 @@ public class Server_PostJSON extends AsyncTask<String, Void, String> {
             connection.setDoOutput(true);
             connection.setRequestMethod("POST");
             connection.setConnectTimeout(20000 /* milliseconds */);
+            connection.connect();
 
             OutputStreamWriter writer = new OutputStreamWriter(connection.getOutputStream());
             writer.write(json);
