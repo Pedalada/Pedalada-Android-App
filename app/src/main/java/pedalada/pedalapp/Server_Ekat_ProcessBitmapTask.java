@@ -36,7 +36,7 @@ public class Server_Ekat_ProcessBitmapTask extends AsyncTask<Bitmap, Void, Strin
     //Olivais: 192.168.1.81:5000
     //Rokas:192.168.56.1
     // Tempelhof airport : 172.21.56.187
-    private static final String SERVER_URL = "http://192.168.2.1/ride";
+    private static final String SERVER_URL = "http://192.168.2.1/";
 
     @Override
     protected void onPreExecute() {
@@ -76,27 +76,35 @@ public class Server_Ekat_ProcessBitmapTask extends AsyncTask<Bitmap, Void, Strin
                 }
             }
         }
+
         return response.toString();
     }
 
     @Override
     protected String doInBackground(Bitmap... params) {
+
         if (params.length == 0) {
             return null;
         }
-        //return the amount of added sugar
+
+        // return the amount of added sugar
         String jsonSugar = "empty";
+
         // process image; convert to a BASE64 String
         Bitmap bitmap = params[0];
         ByteArrayOutputStream bao = new ByteArrayOutputStream();
         bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bao);
         byte[] ba = bao.toByteArray();
+
         // ba1 contains the String of the image to be sent
         String ba1 = Base64.encodeToString(ba,Base64.NO_WRAP);
-        //Base64.DEFAULT seems to insert a new line; replaced with NO_WRAP
+
+        // Base64.DEFAULT seems to insert a new line; replaced with NO_WRAP
         Log.v(LOG_TAG, "Image String: " + ba1);
+
         // send image string to server
         try {
+
             JSONArray response = new JSONArray();
 
             // IPv4 of Ekaterina's computer
@@ -112,20 +120,25 @@ public class Server_Ekat_ProcessBitmapTask extends AsyncTask<Bitmap, Void, Strin
             // DO NOT USE setChunkedStreamingMode: interrupts stream of POST
             //urlConnection.setChunkedStreamingMode(ba1.length());
             urlConnection.connect();
+
             // start content wrapper
             DataOutputStream request = new DataOutputStream(urlConnection.getOutputStream());
             request.writeBytes("Content-Type: multipart/form-data;boundary=" + this.boundary);
             request.writeBytes("Content-Disposition: form-data;" + this.crlf);
             request.writeBytes(this.crlf);
+
             //attach image string to request
             request.writeBytes(ba1);
+
             //end wrapper
             request.writeBytes(this.crlf);
             request.writeBytes(this.twoHyphens + this.boundary + this.twoHyphens + this.crlf);
+
             //close output stream
             request.flush();
             request.close();
-            // receive responce from web service
+
+            // receive response from web service
             int responseCode = urlConnection.getResponseCode();
             Log.v(LOG_TAG, "Received response code: " + responseCode);
             if(responseCode == HTTP_STATUS_OKAY){
@@ -135,14 +148,17 @@ public class Server_Ekat_ProcessBitmapTask extends AsyncTask<Bitmap, Void, Strin
                 jsonSugar = jsonResponse.getString("sugar");
                 Log.v(LOG_TAG, "Received data: " + contentAsString + ", " + jsonSugar);
             } else {
-                if (responseCode == HTTP_STATUS_BAD_REQUEST){
+                if (responseCode == HTTP_STATUS_BAD_REQUEST) {
                     Log.v(LOG_TAG, "Received POST 400: bad request.");
                 }
             }
+
             urlConnection.disconnect();
+
         } catch (Exception e) {
             Log.e(LOG_TAG, "Error in http connection " + e.toString());
         }
+
         return jsonSugar;
     }
 }

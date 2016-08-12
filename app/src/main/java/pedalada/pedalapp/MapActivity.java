@@ -1,6 +1,7 @@
 package pedalada.pedalapp;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -9,6 +10,8 @@ import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -73,7 +76,7 @@ public class MapActivity extends AppCompatActivity {
     static long finishTime;
     static boolean firstUpdate = true;
 
-    // helper for gson
+    // helper for JSON
     String riderUsername = "yourMom";
     Ride ride;
 
@@ -84,6 +87,11 @@ public class MapActivity extends AppCompatActivity {
         initializeViews();
         handleLocationPermissions();
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
         configureButtons();
         configureMap();
         ride = new Ride();
@@ -268,50 +276,50 @@ public class MapActivity extends AppCompatActivity {
         bStop.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
-                // example... but should adjust first to the itinerary performed. Eventually, fit to polygon
-                Bitmap snapshot = mapView.getDrawingMapCache((float) 1.0, (float) 1.0, 1, 1);
-                String stringedBitmap = Utils.getStringFromBitmap(snapshot);
-
-                ride.setUsername(riderUsername);
-                ride.setStartTime(startTime);
-                ride.setFinishTime(finishTime);
-                ride.setRouteRecord(record);
-                ride.setSnapshot(stringedBitmap);
-
-
-                // TODO create the JSON to send to server
-                JSONObject obj = new JSONObject();
-                String sStartTime = String.valueOf(startTime); // because longs are not supported by JSON
-                String sFinishTime = String.valueOf(finishTime);
-                String sRecord = record.toString();
-                String rider = "yourMom";
-                try {
-                    obj.put("rider", rider); // a String
-                    obj.put("startTime", sStartTime);
-                    obj.put("finishTime", sFinishTime);
-                    obj.put("coordinates", sRecord);
-                    obj.put("snapshot", stringedBitmap); // a String
-                } catch (JSONException e) {
-                    Log.d("-> JSONifization failed", e.getMessage());
-                }
-
-                // alternatively convert to gson.JsonObject instead...*
-                Gson gson = new Gson();
-                Log.d("NEW JsonObject -> ", gson.toJson(ride));
-                JsonParser jsonParser = new JsonParser();
-                JsonObject json = (JsonObject) jsonParser.parse(obj.toString()); // *...and use gson.toJson(ride)
-
-                // TODO send record to server before finishing activity
-                Server_MyIonConnection ionConnection = new Server_MyIonConnection();
-                ionConnection.post(bStop.getContext(), json);
-
+                String data = getRideAsJSON(ride).toString();
+                Server_PostJSON post = new Server_PostJSON();
+                post.setUp();
+                post.execute(data);
+                finish();
             }
         });
     }
 
-    // server stuff
-    public static String URL = "192.168.2.2";
-    public static String flaskIp ="127.0.0.1";
+    public boolean greenLight() {
+        ConnectivityManager cnnMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = cnnMgr.getActiveNetworkInfo();
+        if (networkInfo != null && networkInfo.isConnected()) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private JSONObject getRideAsJSON(Ride ride) {
+
+        Bitmap snapshot = mapView.getDrawingMapCache((float) 1.0, (float) 1.0, 1, 1);
+        String stringedBitmap = Utils.getStringFromBitmap(snapshot);
+
+        ride.setUsername(riderUsername);
+        ride.setStartTime(startTime);
+        ride.setFinishTime(finishTime);
+        ride.setRouteRecord(record);
+        ride.setSnapshot(stringedBitmap);
+
+        JSONObject obj = new JSONObject();
+        try {
+            obj.put("rider", ride.getUsername()); // a String
+            obj.put("startTime", String.valueOf(ride.getStartTime()));
+            obj.put("finishTime", String.valueOf(ride.getFinishTime()));
+            obj.put("coordinates", ride.getRouteRecord().toString());
+            obj.put("snapshot", stringedBitmap);
+            return obj;
+        } catch (JSONException e) {
+            Log.d("-> JSONifization failed", e.getMessage());
+            return null;
+        }
+
+    }
+
 }
 
