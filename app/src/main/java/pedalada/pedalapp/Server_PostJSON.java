@@ -8,25 +8,19 @@ import org.json.JSONObject;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 
 /** Uses Android recommended HttpURLConnection */
-public class Server_PostJSON extends AsyncTask<String, Void, String> {
+public class Server_PostJSON extends AsyncTask<JSONObject, Void, String> {
 
-
-    // browserflask <- "http://127.0.0.1/"
-    // pyflask <- "http://10.0.2.2/"
-    // IPv4 <- "http://192.168.123.0/"
-    private static String IPv4 = "http://requestb.in/rgygpbrg";
+    private static String requestBinURL = "http://requestb.in/wbq2d3wb";
     private static URL url;
     private static HttpURLConnection connection;
 
     public static void setUp() { // just sets the URL url
         try {
-            url = new URL(IPv4);
+            url = new URL(requestBinURL);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -34,14 +28,14 @@ public class Server_PostJSON extends AsyncTask<String, Void, String> {
 
 
     @Override
-    protected String doInBackground(String... jasony) { // where strings == JSONObject.toString()
+    protected String doInBackground(JSONObject... jason) {
 
-        if (jasony.length == 0) {
+        if (jason.length == 0) {
             Log.d("NOOB", "THERE IS NO JSON");
             return null;
         }
 
-        String json = jasony[0];
+        JSONObject json = jason[0];
 
 
         try {
@@ -53,9 +47,17 @@ public class Server_PostJSON extends AsyncTask<String, Void, String> {
             connection.setConnectTimeout(20000 /* milliseconds */);
             connection.connect();
 
-            OutputStreamWriter writer = new OutputStreamWriter(connection.getOutputStream());
-            writer.write(json);
-            writer.close();
+            // for the JSON
+            DataOutputStream wr = new DataOutputStream(connection.getOutputStream());
+            wr.writeBytes(json.toString());
+            wr.flush();
+            wr.close();
+
+
+            // for the string version
+            // OutputStreamWriter writer = new OutputStreamWriter(connection.getOutputStream());
+            // writer.write(json);
+            // writer.close();
 
             if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
                 Log.d("writenn", connection.getResponseMessage());

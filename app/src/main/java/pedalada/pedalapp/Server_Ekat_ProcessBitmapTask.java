@@ -36,7 +36,7 @@ public class Server_Ekat_ProcessBitmapTask extends AsyncTask<Bitmap, Void, Strin
     //Olivais: 192.168.1.81:5000
     //Rokas:192.168.56.1
     // Tempelhof airport : 172.21.56.187
-    private static final String SERVER_URL = "http://192.168.2.1/";
+    private static final String SERVER_URL = "";
 
     @Override
     protected void onPreExecute() {

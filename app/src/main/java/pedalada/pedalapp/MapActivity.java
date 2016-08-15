@@ -36,10 +36,13 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Iterator;
 
 public class MapActivity extends AppCompatActivity {
 
@@ -55,6 +58,7 @@ public class MapActivity extends AppCompatActivity {
     TextView mLatitude = null;
     TextView mLongitude = null;
     static TextView serverTV = null;
+    long dStartTime;
 
     // some cool graphics to handled later
     Drawable dStop = null;
@@ -70,7 +74,7 @@ public class MapActivity extends AppCompatActivity {
     GraphicsLayer graphicsLayer = null;
 
     // the record assets
-    static public Double[] currentCoordinates = new Double[2]; // Double[0] <- Longitude
+    static public Double[] currentCoordinates = new Double[6]; // Double[0] <- Longitude
     static ArrayList<Double[]> record = new ArrayList<>();
     static long startTime;
     static long finishTime;
@@ -125,17 +129,18 @@ public class MapActivity extends AppCompatActivity {
                                     ldm.setAutoPanMode(LocationDisplayManager.AutoPanMode.LOCATION);
                                     // Log.d("LocationLISTENER", "lat: " + location.getLatitude() + " long: " + location.getLongitude());
                                     // Log.d("LocationLISTENER", "Location found....");
-                                    updateUI(location);
+                                    updateUI(location, firstUpdate);
                                     updateRecord(location);
                                     addTrackingDot(location);
                                     startTime = location.getTime();
                                     firstUpdate = false;
+                                    dStartTime = System.currentTimeMillis();
                                 } else {
                                     ldm.setShowLocation(true);
                                     ldm.setAutoPanMode(LocationDisplayManager.AutoPanMode.LOCATION);
                                     // Log.d("LocationLISTENER", "lat: " + location.getLatitude() + " long: " + location.getLongitude());
                                     // Log.d("LocationLISTENER", "Location found....");
-                                    updateUI(location);
+                                    updateUI(location, firstUpdate);
                                     updateRecord(location);
                                     addTrackingDot(location);
                                     finishTime = location.getTime();
@@ -184,8 +189,12 @@ public class MapActivity extends AppCompatActivity {
     }
 
     public void updateRecord(Location location) {
-        currentCoordinates[0] = location.getLongitude();
-        currentCoordinates[1] = location.getLatitude();
+        currentCoordinates[0] = (double) location.getTime();
+        currentCoordinates[1] = location.getLongitude();
+        currentCoordinates[2] = location.getLatitude();
+        currentCoordinates[3] = location.getAltitude();
+        currentCoordinates[4] = (double) location.getSpeed();
+        currentCoordinates[5] = (double) location.getAccuracy();
         record.add(currentCoordinates);
     }
 
@@ -210,7 +219,7 @@ public class MapActivity extends AppCompatActivity {
         serverTV = (TextView) findViewById(R.id.serverResponseTextView);
     }
 
-    public void updateUI(Location location) {
+    public void updateUI(Location location, boolean firstUpdate) {
         String longitudeStr = "Longitude: " + location.convert(location.getLongitude(), location.FORMAT_SECONDS);
         String latitudeStr = "Latitude: " + location.convert(location.getLatitude(), location.FORMAT_SECONDS);
         String precisionStr = String.format("Precisão: %.2f", location.getAccuracy());
@@ -222,6 +231,13 @@ public class MapActivity extends AppCompatActivity {
         mSpeed.setText(speedStr);
         mProvider.setText(providerStr);
         mPrecision.setText(precisionStr);
+
+        /*
+        if (firstUpdate == false) {
+            String time = Utils.mmss(System.currentTimeMillis() - dStartTime);
+            mTime.setText(time);
+        }
+        */
     }
 
     public void handleLocationPermissions() {
@@ -276,7 +292,8 @@ public class MapActivity extends AppCompatActivity {
         bStop.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                String data = getRideAsJSON(ride).toString();
+                JSONArray recordJSON = formatRecord(record);
+                JSONObject data = getRideAsJSON(ride, recordJSON);
                 Server_PostJSON post = new Server_PostJSON();
                 post.setUp();
                 post.execute(data);
@@ -295,24 +312,18 @@ public class MapActivity extends AppCompatActivity {
         }
     }
 
-    private JSONObject getRideAsJSON(Ride ride) {
-
-        Bitmap snapshot = mapView.getDrawingMapCache((float) 1.0, (float) 1.0, 1, 1);
-        String stringedBitmap = Utils.getStringFromBitmap(snapshot);
+    private JSONObject getRideAsJSON(Ride ride, JSONArray record) {
 
         ride.setUsername(riderUsername);
         ride.setStartTime(startTime);
         ride.setFinishTime(finishTime);
-        ride.setRouteRecord(record);
-        ride.setSnapshot(stringedBitmap);
 
         JSONObject obj = new JSONObject();
         try {
             obj.put("rider", ride.getUsername()); // a String
             obj.put("startTime", String.valueOf(ride.getStartTime()));
             obj.put("finishTime", String.valueOf(ride.getFinishTime()));
-            obj.put("coordinates", ride.getRouteRecord().toString());
-            obj.put("snapshot", stringedBitmap);
+            obj.put("record", record);
             return obj;
         } catch (JSONException e) {
             Log.d("-> JSONifization failed", e.getMessage());
@@ -321,5 +332,21 @@ public class MapActivity extends AppCompatActivity {
 
     }
 
+    private JSONArray formatRecord(ArrayList<Double[]> record) {
+        JSONArray outerArray = new JSONArray();
+        Iterator<Double[]> itr = record.iterator();
+        while (itr.hasNext()) {
+            JSONArray innerArray = new JSONArray();
+            Double[] c = itr.next();
+            for (int i = 0; i < c.length; i++) {
+                innerArray.put(c[i]);
+            }
+            outerArray.put(innerArray);
+        }
+        return outerArray;
+    }
+
+
 }
+
 

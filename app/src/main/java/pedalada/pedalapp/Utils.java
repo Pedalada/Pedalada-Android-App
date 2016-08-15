@@ -40,60 +40,21 @@ public class Utils extends AppCompatActivity {
         return decodedByte;
     }
 
-    // bullshiiieeeettt
-    // http://stackoverflow.com/questions/4966188/how-to-post-data-in-android-to-server-in-json-format
-//    public static String putDataToServer(String url, JSONObject returnedJObject) throws Throwable {
-//
-//        HttpPost request = new HttpPost(url);
-//        JSONStringer json = new JSONStringer();
-//        StringBuilder sb=new StringBuilder();
-//
-//        if (returnedJObject!=null) {
-//            Iterator<String> itKeys = returnedJObject.keys();
-//            if(itKeys.hasNext())
-//                json.object();
-//            while (itKeys.hasNext()) {
-//                String k=itKeys.next();
-//                json.key(k).value(returnedJObject.get(k));
-//                Log.e("keys "+k,"value "+returnedJObject.get(k).toString());
-//            }
-//        }
-//        json.endObject();
-//
-//        StringEntity entity = new StringEntity(json.toString());
-//        entity.setContentType("application/json;charset=UTF-8");
-//        entity.setContentEncoding(new BasicHeader(HTTP.CONTENT_TYPE,"application/json;charset=UTF-8"));
-//        request.setHeader("Accept", "application/json");
-//        request.setEntity(entity);
-//
-//        HttpResponse response =null;
-//        DefaultHttpClient httpClient = new DefaultHttpClient();
-//
-//        HttpConnectionParams.setSoTimeout(httpClient.getParams(), SyncStateContract.Constants.ANDROID_CONNECTION_TIMEOUT*1000);
-//        HttpConnectionParams.setConnectionTimeout(httpClient.getParams(), SyncStateContract.Constants.ANDROID_CONNECTION_TIMEOUT*1000);
-//        try{
-//            response = httpClient.execute(request);
-//        }
-//        catch(SocketException se) {
-//            Log.e("SocketException", se+"");
-//            throw se;
-//        }
-//
-//        InputStream in = response.getEntity().getContent();
-//        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-//        String line = null;
-//        while((line = reader.readLine()) != null){
-//            sb.append(line);
-//        }
-//        return sb.toString();
-//    }
-
     static String hhmmss(long millis) {
         return String.format("%02d:%02d:%02d",
                 TimeUnit.MILLISECONDS.toHours(millis),
                 TimeUnit.MILLISECONDS.toMinutes(millis) - TimeUnit.HOURS.toMinutes(TimeUnit.MILLISECONDS.toHours(millis)),
                 TimeUnit.MILLISECONDS.toSeconds(millis) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis)));
 
+    }
+
+    static String mmss(long millis) {
+        int seconds = (int) millis * 1000; // watch out for limits
+        if (seconds / 60 < 0) {
+            return String.format("%ds", seconds);
+        } else {
+            return String.format("%d:%02d", seconds / 60, seconds % 60);
+        }
     }
 
     /** Obtains distance in meters between two coordinates.
