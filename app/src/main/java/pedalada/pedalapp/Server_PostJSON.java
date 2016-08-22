@@ -14,7 +14,7 @@ import java.net.URL;
 /** Uses Android recommended HttpURLConnection */
 public class Server_PostJSON extends AsyncTask<JSONObject, Void, String> {
 
-    private static String requestBinURL = "http://requestb.in/wbq2d3wb";
+    private static String requestBinURL = "http://requestb.in/1n8qs1c1";
     private static URL url;
     private static HttpURLConnection connection;
 

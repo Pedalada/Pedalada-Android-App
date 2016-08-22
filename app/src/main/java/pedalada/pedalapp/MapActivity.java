@@ -4,7 +4,6 @@ import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.location.Location;
@@ -32,17 +31,10 @@ import com.esri.core.geometry.Point;
 import com.esri.core.geometry.SpatialReference;
 import com.esri.core.map.Graphic;
 import com.esri.core.symbol.SimpleMarkerSymbol;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Iterator;
 
 public class MapActivity extends AppCompatActivity {
 
@@ -57,7 +49,7 @@ public class MapActivity extends AppCompatActivity {
     TextView mPrecision = null;
     TextView mLatitude = null;
     TextView mLongitude = null;
-    static TextView serverTV = null;
+    TextView userTV = null;
     long dStartTime;
 
     // some cool graphics to handled later
@@ -74,15 +66,15 @@ public class MapActivity extends AppCompatActivity {
     GraphicsLayer graphicsLayer = null;
 
     // the record assets
-    static public Double[] currentCoordinates = new Double[6]; // Double[0] <- Longitude
-    static ArrayList<Double[]> record = new ArrayList<>();
+    // static public Double[] currentCoordinates = new Double[6]; // Double[0] <- Longitude
+    // static ArrayList<Double[]> record = new ArrayList<>();
     static long startTime;
     static long finishTime;
     static boolean firstUpdate = true;
+    static JSONArray outerArray = new JSONArray();
 
     // helper for JSON
-    String riderUsername = "yourMom";
-    Ride ride;
+    String riderFbID = "anon";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -91,6 +83,9 @@ public class MapActivity extends AppCompatActivity {
         initializeViews();
         handleLocationPermissions();
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        if (StartActivity.userID != null) {
+            riderFbID = StartActivity.userID;
+        }
     }
 
     @Override
@@ -98,7 +93,6 @@ public class MapActivity extends AppCompatActivity {
         super.onStart();
         configureButtons();
         configureMap();
-        ride = new Ride();
     }
 
     // to save battery or not to save battery, that is the question.
@@ -189,13 +183,20 @@ public class MapActivity extends AppCompatActivity {
     }
 
     public void updateRecord(Location location) {
-        currentCoordinates[0] = (double) location.getTime();
-        currentCoordinates[1] = location.getLongitude();
-        currentCoordinates[2] = location.getLatitude();
-        currentCoordinates[3] = location.getAltitude();
-        currentCoordinates[4] = (double) location.getSpeed();
-        currentCoordinates[5] = (double) location.getAccuracy();
-        record.add(currentCoordinates);
+
+        try {
+            JSONArray inner = new JSONArray();
+            inner.put(location.getTime()); // long
+            inner.put(location.getLongitude());
+            inner.put(location.getLatitude());
+            inner.put(location.getAltitude());
+            inner.put((int) location.getSpeed()); // float
+            inner.put((int) location.getAccuracy()); // float
+            outerArray.put(inner);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
     }
 
     public void initializeViews() {
@@ -212,11 +213,10 @@ public class MapActivity extends AppCompatActivity {
         mLatitude = (TextView) findViewById(R.id.latitude);
         mLongitude = (TextView) findViewById(R.id.longitude);
 
+        userTV.setText("User: " + riderFbID);
+
         // initialize map
         mapView = (MapView) findViewById(R.id.map);
-
-        // server text view
-        serverTV = (TextView) findViewById(R.id.serverResponseTextView);
     }
 
     public void updateUI(Location location, boolean firstUpdate) {
@@ -292,8 +292,8 @@ public class MapActivity extends AppCompatActivity {
         bStop.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                JSONArray recordJSON = formatRecord(record);
-                JSONObject data = getRideAsJSON(ride, recordJSON);
+                // JSONArray recordJSON = formatRecord(record);
+                JSONObject data = getRideAsJSON();
                 Server_PostJSON post = new Server_PostJSON();
                 post.setUp();
                 post.execute(data);
@@ -312,18 +312,14 @@ public class MapActivity extends AppCompatActivity {
         }
     }
 
-    private JSONObject getRideAsJSON(Ride ride, JSONArray record) {
-
-        ride.setUsername(riderUsername);
-        ride.setStartTime(startTime);
-        ride.setFinishTime(finishTime);
+    private JSONObject getRideAsJSON() {
 
         JSONObject obj = new JSONObject();
         try {
-            obj.put("rider", ride.getUsername()); // a String
-            obj.put("startTime", String.valueOf(ride.getStartTime()));
-            obj.put("finishTime", String.valueOf(ride.getFinishTime()));
-            obj.put("record", record);
+            obj.put("facebookID", riderFbID); // a String, may parse as long?
+            obj.put("startTime", startTime);
+            obj.put("finishTime", finishTime);
+            obj.put("record", outerArray);
             return obj;
         } catch (JSONException e) {
             Log.d("-> JSONifization failed", e.getMessage());
@@ -331,21 +327,6 @@ public class MapActivity extends AppCompatActivity {
         }
 
     }
-
-    private JSONArray formatRecord(ArrayList<Double[]> record) {
-        JSONArray outerArray = new JSONArray();
-        Iterator<Double[]> itr = record.iterator();
-        while (itr.hasNext()) {
-            JSONArray innerArray = new JSONArray();
-            Double[] c = itr.next();
-            for (int i = 0; i < c.length; i++) {
-                innerArray.put(c[i]);
-            }
-            outerArray.put(innerArray);
-        }
-        return outerArray;
-    }
-
 
 }
 
